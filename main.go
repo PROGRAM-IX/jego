@@ -6,9 +6,11 @@ import (
     "math/rand"
     "time"
 	"github.com/faiface/pixel"
-	"github.com/faiface/pixel/pixelgl"
+	"github.com/faiface/pixel/text"
+    "github.com/faiface/pixel/pixelgl"
 	"github.com/faiface/pixel/imdraw"
     "golang.org/x/image/colornames"
+    "golang.org/x/image/font/basicfont"
 )
 
 type Enemy struct {
@@ -24,7 +26,6 @@ var pPos pixel.Vec
 var pSpeed float64 = 100.0
 var eSpeed float64 = 50.0
 var playerShape *imdraw.IMDraw
-//var win *pixelgl.Window
 
 var Tolerance = 2.0
 
@@ -32,6 +33,10 @@ var PlayerShapePoints = [][]float64 {{-5.0, 0.0}, {0.0, -5.0}, {5.0, 0.0}, {0.0,
 var EnemyShapePoints = [][]float64 {{-5.0, -5.0}, {5.0, -5.0}, {5.0, 5.0}, {-5.0, 5.0}}
 
 var enemyIDBase = 100
+
+var basicAtlas = text.NewAtlas(basicfont.Face7x13, text.ASCII)
+var basicText = text.New(pixel.V(100, 500), basicAtlas)
+
 
 func enemyID() int {
     enemyIDBase++
@@ -48,8 +53,6 @@ func makeShape(pos *pixel.Vec, shape *imdraw.IMDraw, points [][]float64, colour 
 }
 
 func setup() {
-    fmt.Println("SETUP")
-    // SETUP VARIABLES
     enemyList = nil
     pPos = pixel.V(200, 200)
     var eX, eY float64
@@ -67,7 +70,6 @@ func setup() {
 
     state = 1 // 1 = start screen, 2 = game
     fmt.Println("Hey it's the start of the game, we're not doing anything yet really.")
-    // END SETUP VARIABLES
 }
 
 func processInput(dt float64, win *pixelgl.Window) {
@@ -158,6 +160,7 @@ func updateLoop(win *pixelgl.Window) {
         if win.Pressed(pixelgl.KeySpace) {
             state = 2
         }
+        basicText.Draw(win, pixel.IM.Scaled(basicText.Orig, 5))
     } else if state == 2 {
         win.Clear(colornames.Aliceblue)
         dt := time.Since(last).Seconds()
@@ -186,6 +189,7 @@ func run() {
 		panic(err)
 	}
 
+    fmt.Fprintln(basicText, "JUST EVASION")
     setup()
 
     for !win.Closed() {
