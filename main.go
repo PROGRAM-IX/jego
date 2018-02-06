@@ -24,6 +24,7 @@ var pPos pixel.Vec
 var pSpeed float64 = 100.0
 var eSpeed float64 = 50.0
 var playerShape *imdraw.IMDraw
+//var win *pixelgl.Window
 
 var Tolerance = 2.0
 
@@ -50,7 +51,6 @@ func setup() {
     fmt.Println("SETUP")
     // SETUP VARIABLES
     enemyList = nil
-    fmt.Println("slice length after slice nil:", len(enemyList))
     pPos = pixel.V(200, 200)
     var eX, eY float64
     // When eX, eY are randomised, they always give the same values...
@@ -70,6 +70,111 @@ func setup() {
     // END SETUP VARIABLES
 }
 
+func processInput(dt float64, win *pixelgl.Window) {
+    if win.Pressed(pixelgl.KeyLeft) {
+        pPos.X -= pSpeed * dt
+    }
+    if win.Pressed(pixelgl.KeyRight) {
+        pPos.X += pSpeed * dt
+    }
+    if win.Pressed(pixelgl.KeyDown) {
+        pPos.Y -= pSpeed * dt
+    }
+    if win.Pressed(pixelgl.KeyUp) {
+        pPos.Y += pSpeed * dt
+    }
+}
+
+func moveEnemies(dt float64, win *pixelgl.Window) {
+    // Move enemies
+    for index, enemy := range enemyList {
+        // move enemy towards player position
+        if enemy.pos.X > pPos.X {
+            enemy.pos.X -= eSpeed * dt
+        } else if enemy.pos.X < pPos.X {
+            enemy.pos.X += eSpeed * dt
+        }
+        if enemy.pos.Y > pPos.Y {
+            enemy.pos.Y -= eSpeed * dt
+        } else if enemy.pos.Y < pPos.Y {
+            enemy.pos.Y += eSpeed * dt
+        }
+
+        // Game over if player touches an enemy
+        if math.Abs(enemy.pos.X - pPos.X) < Tolerance && math.Abs(enemy.pos.Y - pPos.Y) < Tolerance {
+            fmt.Println("Game Over!")
+            setup()
+        }
+
+        // Draw individual enemy
+        enemy.shape = imdraw.New(nil)
+        makeShape(enemy.pos, enemy.shape, EnemyShapePoints, pixel.RGB(1, 0.6, 0))
+        enemy.shape.Draw(win)
+
+        // Structs are copied by value so I need to reassign it???
+        // Probably is a neater way...
+        enemyList[index] = enemy
+    }
+    var deadEnemies = make(map[int]bool)
+
+    // Collide/delete enemies
+    for index, enemy := range enemyList {
+        for innerIndex, innerEnemy := range enemyList {
+            if index != innerIndex && math.Abs(enemy.pos.X - innerEnemy.pos.X) < Tolerance && math.Abs(enemy.pos.Y - innerEnemy.pos.Y) < Tolerance {
+                deadEnemies[innerEnemy.id] = true
+                fmt.Println(enemy.id)
+                continue
+            }
+        }
+    }
+    if len(deadEnemies) > 0 {
+        fmt.Println(deadEnemies)
+        for k := 0; k < len(enemyList); k++ {
+            fmt.Println("index", k)
+            if deadEnemies[enemyList[k].id] {
+                fmt.Println("removed ", enemyList[k].id)
+                enemyList[k].pos = nil
+                enemyList[k].shape = nil
+                enemyList[len(enemyList)-1], enemyList[k] = enemyList[k], enemyList[len(enemyList)-1]
+                enemyList = enemyList[:len(enemyList)-1]
+                k-- // now that we've deleted something, we have to go back
+                fmt.Println("index", k)
+            }
+        }
+    }
+
+    if len(enemyList) < 1 {
+        fmt.Println("Game Over!")
+        setup()
+    }
+}
+
+func updateLoop(win *pixelgl.Window) {
+    if win.Pressed(pixelgl.KeyEscape) {
+        win.SetClosed(true)
+    }
+    if state == 1 {
+        win.Clear(colornames.Purple)
+        if win.Pressed(pixelgl.KeySpace) {
+            state = 2
+        }
+    } else if state == 2 {
+        win.Clear(colornames.Aliceblue)
+        dt := time.Since(last).Seconds()
+        last = time.Now()
+        processInput(dt, win)
+
+        moveEnemies(dt, win)
+
+        // Draw player
+        playerShape = imdraw.New(nil)
+        makeShape(&pPos, playerShape, PlayerShapePoints, pixel.RGB(0.6, 0, 1))
+        playerShape.Draw(win)
+    }
+    // Final window draw
+    win.Update()
+}
+
 func run() {
     cfg := pixelgl.WindowConfig{
 		Title: "JEGO",
@@ -84,96 +189,7 @@ func run() {
     setup()
 
     for !win.Closed() {
-        if win.Pressed(pixelgl.KeyEscape) {
-            return
-        }
-        if state == 1 {
-            win.Clear(colornames.Purple)
-            if win.Pressed(pixelgl.KeySpace) {
-                state = 2
-            }
-        } else if state == 2 {
-            win.Clear(colornames.Aliceblue)
-            dt := time.Since(last).Seconds()
-            last = time.Now()
-            if win.Pressed(pixelgl.KeyLeft) {
-                pPos.X -= pSpeed * dt
-            }
-            if win.Pressed(pixelgl.KeyRight) {
-                pPos.X += pSpeed * dt
-            }
-            if win.Pressed(pixelgl.KeyDown) {
-                pPos.Y -= pSpeed * dt
-            }
-            if win.Pressed(pixelgl.KeyUp) {
-                pPos.Y += pSpeed * dt
-            }
-            // Move enemies
-            for index, enemy := range enemyList {
-                // move enemy towards player position
-                if enemy.pos.X > pPos.X {
-                    enemy.pos.X -= eSpeed * dt
-                } else if enemy.pos.X < pPos.X {
-                    enemy.pos.X += eSpeed * dt
-                }
-                if enemy.pos.Y > pPos.Y {
-                    enemy.pos.Y -= eSpeed * dt
-                } else if enemy.pos.Y < pPos.Y {
-                    enemy.pos.Y += eSpeed * dt
-                }
-                // Game over if player touches an enemy
-                if math.Abs(enemy.pos.X - pPos.X) < Tolerance && math.Abs(enemy.pos.Y - pPos.Y) < Tolerance {
-                    fmt.Println("Game Over!")
-                    setup()
-                }
-                // Draw individual enemy
-                enemy.shape = imdraw.New(nil)
-                makeShape(enemy.pos, enemy.shape, EnemyShapePoints, pixel.RGB(1, 0.6, 0))
-                enemy.shape.Draw(win)
-                // Structs are copied by value so I need to reassign it???
-                // Probably is a neater way...
-                enemyList[index] = enemy
-            }
-            var deadEnemies = make(map[int]bool)
-            // Collide/delete enemies
-            for index, enemy := range enemyList {
-                for innerIndex, innerEnemy := range enemyList {
-                    if index != innerIndex && math.Abs(enemy.pos.X - innerEnemy.pos.X) < Tolerance && math.Abs(enemy.pos.Y - innerEnemy.pos.Y) < Tolerance {
-                        deadEnemies[innerEnemy.id] = true
-                        fmt.Println(enemy.id)
-                        //deadEnemies[enemy.id] = true // do we want to kill both? :thinking:
-                        continue
-                    }
-                }
-            }
-            if len(deadEnemies) > 0 {
-                fmt.Println(deadEnemies)
-                for k := 0; k < len(enemyList); k++ {
-                    fmt.Println("index", k)
-                    if deadEnemies[enemyList[k].id] {
-                        fmt.Println("removed ", enemyList[k].id)
-                        enemyList[k].pos = nil
-                        enemyList[k].shape = nil
-                        enemyList[len(enemyList)-1], enemyList[k] = enemyList[k], enemyList[len(enemyList)-1]
-                        enemyList = enemyList[:len(enemyList)-1]
-                        k-- // now that we've deleted something, we have to go back
-                        fmt.Println("index", k)
-                    }
-                }
-            }
-
-            if len(enemyList) < 1 {
-                fmt.Println("Game Over!")
-                setup()
-            }
-
-            // Draw player
-            playerShape = imdraw.New(nil)
-            makeShape(&pPos, playerShape, PlayerShapePoints, pixel.RGB(0.6, 0, 1))
-            playerShape.Draw(win)
-        }
-        // Final window draw
-		win.Update()
+        updateLoop(win)
 	}
 }
 
