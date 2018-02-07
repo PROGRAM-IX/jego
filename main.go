@@ -158,6 +158,7 @@ func updateLoop(win *pixelgl.Window) {
     if state == 1 {
         win.Clear(colornames.Purple)
         if win.Pressed(pixelgl.KeySpace) {
+            last = time.Now()
             state = 2
         }
         basicText.Draw(win, pixel.IM.Scaled(basicText.Orig, 5))
