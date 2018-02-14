@@ -5,6 +5,7 @@ import (
     "math"
     "math/rand"
     "time"
+    "strconv"
 	"github.com/faiface/pixel"
 	"github.com/faiface/pixel/text"
     "github.com/faiface/pixel/pixelgl"
@@ -28,19 +29,33 @@ var eSpeed float64 = 50.0
 var playerShape *imdraw.IMDraw
 
 var Tolerance = 2.0
+var SafeTolerance = 50.0
 
 var PlayerShapePoints = [][]float64 {{-5.0, 0.0}, {0.0, -5.0}, {5.0, 0.0}, {0.0, 5.0}}
 var EnemyShapePoints = [][]float64 {{-5.0, -5.0}, {5.0, -5.0}, {5.0, 5.0}, {-5.0, 5.0}}
 
 var enemyIDBase = 100
 
+var score = 0
+var highScore = 0
+
 var basicAtlas = text.NewAtlas(basicfont.Face7x13, text.ASCII)
-var basicText = text.New(pixel.V(100, 500), basicAtlas)
+var titleText = text.New(pixel.V(100, 500), basicAtlas)
+var scoreText = text.New(pixel.V(20, 700), basicAtlas)
 
 
 func enemyID() int {
     enemyIDBase++
     return enemyIDBase
+}
+
+func increaseScore() {
+    score += 100
+    fmt.Println("Score: ", score)
+    if (score > highScore) {
+        highScore = score
+        fmt.Println("High score: ", highScore)
+    }
 }
 
 func makeShape(pos *pixel.Vec, shape *imdraw.IMDraw, points [][]float64, colour pixel.RGBA) *imdraw.IMDraw {
@@ -52,16 +67,41 @@ func makeShape(pos *pixel.Vec, shape *imdraw.IMDraw, points [][]float64, colour 
     return shape
 }
 
-func setup() {
-    enemyList = nil
-    pPos = pixel.V(200, 200)
+func newEnemyPos(pPos pixel.Vec, enemyList []Enemy) pixel.Vec {
+    if (len(enemyList) == 0) {
+        fmt.Println("Need enemies in this list!")
+    }
     var eX, eY float64
-    // When eX, eY are randomised, they always give the same values...
-    for i := 0; i < 10; i++ {
+    tries := 0
+    for tries < 5 {
         eX = rand.Float64()*1010
         eY = rand.Float64()*752
-        fmt.Println(eX, eY)
-        v := pixel.V(eX, eY)
+        if(math.Abs(eX - pPos.X) < SafeTolerance && math.Abs(eY - pPos.Y) < SafeTolerance) {
+            tries += 1
+            continue
+        } else {
+            break
+        }
+    }
+    if(tries >= 5) {
+        // frick it I guess
+        // there is a better way no doubt
+        // we will get to that
+        fmt.Println("Failed to generate safe enemy position.")
+        eX = rand.Float64()*1010
+        eY = rand.Float64()*752
+    }
+    //fmt.Println(eX, eY)
+    return pixel.V(eX, eY)
+}
+
+func setup() {
+    score = 0
+    scoreText.Color = colornames.Purple
+    enemyList = nil
+    pPos = pixel.V(200, 200)
+    for i := 0; i < 10; i++ {
+        v := newEnemyPos(pPos, enemyList)
         enemyList = append(enemyList, Enemy{&v, imdraw.New(nil), enemyID()})
     }
     playerShape = imdraw.New(nil)
@@ -69,7 +109,7 @@ func setup() {
     last = time.Now()
 
     state = 1 // 1 = start screen, 2 = game
-    fmt.Println("Hey it's the start of the game, we're not doing anything yet really.")
+    fmt.Println("Game start!")
 }
 
 func processInput(dt float64, win *pixelgl.Window) {
@@ -124,23 +164,24 @@ func moveEnemies(dt float64, win *pixelgl.Window) {
         for innerIndex, innerEnemy := range enemyList {
             if index != innerIndex && math.Abs(enemy.pos.X - innerEnemy.pos.X) < Tolerance && math.Abs(enemy.pos.Y - innerEnemy.pos.Y) < Tolerance {
                 deadEnemies[innerEnemy.id] = true
-                fmt.Println(enemy.id)
+                //fmt.Println(enemy.id)
                 continue
             }
         }
     }
     if len(deadEnemies) > 0 {
-        fmt.Println(deadEnemies)
+        //fmt.Println(deadEnemies)
         for k := 0; k < len(enemyList); k++ {
-            fmt.Println("index", k)
+            //fmt.Println("index", k)
             if deadEnemies[enemyList[k].id] {
-                fmt.Println("removed ", enemyList[k].id)
+                //fmt.Println("removed ", enemyList[k].id)
                 enemyList[k].pos = nil
                 enemyList[k].shape = nil
                 enemyList[len(enemyList)-1], enemyList[k] = enemyList[k], enemyList[len(enemyList)-1]
                 enemyList = enemyList[:len(enemyList)-1]
+                increaseScore()
                 k-- // now that we've deleted something, we have to go back
-                fmt.Println("index", k)
+                //fmt.Println("index", k)
             }
         }
     }
@@ -161,7 +202,7 @@ func updateLoop(win *pixelgl.Window) {
             last = time.Now()
             state = 2
         }
-        basicText.Draw(win, pixel.IM.Scaled(basicText.Orig, 5))
+        titleText.Draw(win, pixel.IM.Scaled(titleText.Orig, 5))
     } else if state == 2 {
         win.Clear(colornames.Aliceblue)
         dt := time.Since(last).Seconds()
@@ -174,6 +215,11 @@ func updateLoop(win *pixelgl.Window) {
         playerShape = imdraw.New(nil)
         makeShape(&pPos, playerShape, PlayerShapePoints, pixel.RGB(0.6, 0, 1))
         playerShape.Draw(win)
+        scoreText.Clear()
+        scoreText.Dot = scoreText.Orig // Clear() is supposed to do this!!!
+        scoreText.WriteString(strconv.Itoa(score))
+        //fmt.Fprintln(scoreText, score)
+        scoreText.Draw(win, pixel.IM.Scaled(scoreText.Orig, 4))
     }
     // Final window draw
     win.Update()
@@ -190,7 +236,7 @@ func run() {
 		panic(err)
 	}
 
-    fmt.Fprintln(basicText, "JUST EVASION")
+    fmt.Fprintln(titleText, "JUST EVASION")
     setup()
 
     for !win.Closed() {
