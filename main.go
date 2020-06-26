@@ -143,11 +143,10 @@ func moveEnemies(dt float64, win *pixelgl.Window) {
         }
 
         // Game over if player touches an enemy
-        if math.Abs(enemy.pos.X - pPos.X) < Tolerance && math.Abs(enemy.pos.Y - pPos.Y) < Tolerance {
-            fmt.Println("Game Over!")
+		if math.Abs(enemy.pos.X-pPos.X) < Tolerance && math.Abs(enemy.pos.Y-pPos.Y) < Tolerance {
+			fmt.Println("Game Over! - Touched enemy")
             setup()
-        }
-
+		} else {
         // Draw individual enemy
         enemy.shape = imdraw.New(nil)
         makeShape(enemy.pos, enemy.shape, EnemyShapePoints, pixel.RGB(1, 0.6, 0))
@@ -158,6 +157,7 @@ func moveEnemies(dt float64, win *pixelgl.Window) {
         enemyList[index] = enemy
     }
     var deadEnemies = make(map[int]bool)
+	}
 
     // Collide/delete enemies
     for index, enemy := range enemyList {
